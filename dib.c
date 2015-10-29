@@ -1,3 +1,9 @@
+/*
+ * Disk Image Browser Project
+ * dib.c
+ *
+ * This program duplicates the contents of a given disk image
+ */
 #include <tsk/libtsk.h>
 #include <sys/stat.h>
 #include <stdio.h>
@@ -71,6 +77,9 @@ void printDirectory(TSK_VS_PART_INFO *vsInfo, char *dirPath, TSK_INUM_T inum) {
    tsk_fs_close(fs);
 }
 
+/* Copy a file from disk image to same relative location in the copy of the
+ * disk image
+ */
 void copyFile(TSK_FS_INFO *fs, char *filePath, char *fileName) {
    TSK_FS_FILE *file;
    TSK_FS_DIR *dir;
@@ -82,7 +91,6 @@ void copyFile(TSK_FS_INFO *fs, char *filePath, char *fileName) {
    int err;
    ssize_t bytesRead;
    size_t check;
-   //size_t len;
 
    if (filePath == NULL)
       printf("EMPTY file path\n");
@@ -96,28 +104,19 @@ void copyFile(TSK_FS_INFO *fs, char *filePath, char *fileName) {
    if (strcmp(fullPath, "/"))
       strcat(fullPath, "/");
 
-   //len = strlen(filePath);
-   //printf("hello\n");
-   //printf("file path: %s\n", strcat(filePath, fileName));
-   //Open the file
-   printf("hi\n");
    file = tsk_fs_file_open(fs, NULL, strcat(fullPath, fileName));
-   printf("hi\n");
+
    if (file == NULL) 
       printf("Problem opening file: %s\n", fullPath);
 
-   printf("Full path is %s\n", fullPath);
    newPath = &(fullPath[1]);
-   printf("New path is %s\n", newPath);
+
    if (file->meta->type == TSK_FS_META_TYPE_DIR) {
-      printf("%s was a directory\n", fileName);
-      printf("Hey-o\n");
 
       dir = tsk_fs_dir_open(fs, fullPath);
       if (!dir)
-         printf("ERROR opening directory\n");
+         printf("ERROR: Could not open directory\n");
 
-      printf("Attempting to make directory %s\n", fullPath);
       err = mkdir(newPath, S_IRWXU | S_IRWXG | S_IRWXO);
    
       if (err < 0)
@@ -128,13 +127,10 @@ void copyFile(TSK_FS_INFO *fs, char *filePath, char *fileName) {
          if (strcmp(".", dir->names[i].name) && strcmp("..", dir->names[i].name)) {
             printf("%s\n", dir->names[i].name);
             copyFile(fs, fullPath, dir->names[i].name);
-            //printf("%s - inum: %d\n", dir->names[i].name, (int)dir->names[i].meta_addr);
          }
       }
-      //exit(0);
    }
    else {
-      printf("Attempting to create file %s\n", fullPath);
       //Allocate memory to hold file contents
       buf = malloc(file->meta->size);
 
@@ -147,7 +143,7 @@ void copyFile(TSK_FS_INFO *fs, char *filePath, char *fileName) {
       //Write contents into file
       check = fwrite(buf, bytesRead, 1, fp);
       if (check < 0)
-         printf("ERROR writing file\n");
+         printf("ERROR: Could not write file\n");
 
       //Close the new file
       fclose(fp);
@@ -159,6 +155,10 @@ void copyFile(TSK_FS_INFO *fs, char *filePath, char *fileName) {
       tsk_fs_file_close(file);
    }
 }
+
+/* Copies all of the files of the disk image by calling copyFile for each 
+ * file on the disk
+ */
 void copyAllFiles(TSK_VS_PART_INFO *vs) {
    TSK_FS_INFO *fs;
    TSK_FS_DIR *dir;
@@ -179,12 +179,12 @@ void copyAllFiles(TSK_VS_PART_INFO *vs) {
    strcpy(filePath, "/");
 
    if (fs == NULL) {
-      printf("Could not open fs. :(\n");
+      printf("ERROR: Could not open filesystem.\n");
    }
 
    dir = tsk_fs_dir_open(fs, "");
    if (!dir)
-      printf("ERROR opening root directory\n");
+      printf("ERROR: Could not open root directory\n");
 
    err = mkdir("root", S_IRWXU | S_IRWXG | S_IRWXO);
    
@@ -209,8 +209,6 @@ int main(int argc, char **argv) {
    TSK_IMG_TYPE_ENUM imgType = TSK_IMG_TYPE_DETECT;
    TSK_VS_TYPE_ENUM vsType = TSK_VS_TYPE_DETECT;
    TSK_FS_TYPE_ENUM fsType = TSK_FS_TYPE_DETECT;
-
-   TSK_FS_DIR_WALK_FLAG_ENUM dirWalkFlag = TSK_FS_DIR_WALK_FLAG_NONE;
    
    TSK_IMG_INFO *disk;
    TSK_VS_INFO *vs;
@@ -231,9 +229,6 @@ int main(int argc, char **argv) {
    ssize_t bytesRead = 0;
    FILE *fp;
    size_t check;
-
-   printf("MALLOC ATTEMPT\n");
-   dirPath = malloc(3452);
 
    //Verify correct number of arguments
    if (argc != NUM_ARGS) {
@@ -265,15 +260,11 @@ int main(int argc, char **argv) {
    //Build list of partitions with valid file systems
    buildPartList(allPartList, &partList);
 
-   printf("Attempting to copy all files\n");
-   //Copy ALL the files
+   //Copy all of the files
    copyAllFiles(partList);
 
    //Print input directory
    printDirectory(partList, dirPath, inu);
-
-   //Copy file to output - Hardcoded for testing right now
-   //copyFile(partList, dirPath, inu, "out.txt");
 
    //Close disk objects
    tsk_vs_close(vs);
