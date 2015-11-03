@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#define NUM_ARGS 4
+#define NUM_ARGS 3
 #define ERROR -1
 #define SUCCESS 0
 #define MAX_PATH 260
@@ -19,11 +19,13 @@ void buildPartList(TSK_VS_PART_INFO *allPartList, TSK_VS_PART_INFO **partListHea
    int i = 1;
    TSK_VS_PART_INFO *partList = NULL;
    while (allPartList) {
+      /* testing printf's
       printf("Partition #%d:\n", i++);
       printf("Address: %d\n", allPartList->addr);
       printf("Description: %s\n", allPartList->desc);
       printf("Num Sectors: %d\n", (int)allPartList->len);
       printf("Sector Offset: %d\n", (int)allPartList->start);
+      */
       if (allPartList->slot_num >= 0) {
          if (*partListHead == NULL) {
             partList = *partListHead = allPartList;
@@ -38,7 +40,7 @@ void buildPartList(TSK_VS_PART_INFO *allPartList, TSK_VS_PART_INFO **partListHea
    }
 }
 
-//Print directory using path to directory or its inum
+//Print directory using path to directory or its inum -- for testing
 void printDirectory(TSK_VS_PART_INFO *vsInfo, char *dirPath, TSK_INUM_T inum) {
    TSK_FS_INFO *fs;
    TSK_FS_DIR *dir;
@@ -67,10 +69,12 @@ void printDirectory(TSK_VS_PART_INFO *vsInfo, char *dirPath, TSK_INUM_T inum) {
       }
    }
 
-   //Prints all files in directory including inum
+   //Prints all files in directory including inum -- testing
+   /*
    for (i = 0; i < dir->names_used; i++) {
       printf("%s - inum: %d\n", dir->names[i].name, (int)dir->names[i].meta_addr);
    }
+   */
 
    //Close fs objects
    tsk_fs_dir_close(dir);
@@ -125,7 +129,7 @@ void copyFile(TSK_FS_INFO *fs, char *filePath, char *fileName) {
       //Recursive call to copy files in this directory
       for (i = 0; i < dir->names_used; i++) {
          if (strcmp(".", dir->names[i].name) && strcmp("..", dir->names[i].name)) {
-            printf("%s\n", dir->names[i].name);
+            //printf("%s\n", dir->names[i].name);
             copyFile(fs, fullPath, dir->names[i].name);
          }
       }
@@ -159,7 +163,7 @@ void copyFile(TSK_FS_INFO *fs, char *filePath, char *fileName) {
 /* Copies all of the files of the disk image by calling copyFile for each 
  * file on the disk
  */
-void copyAllFiles(TSK_VS_PART_INFO *vs) {
+void copyAllFiles(TSK_VS_PART_INFO *vs, char *rootName) {
    TSK_FS_INFO *fs;
    TSK_FS_DIR *dir;
    TSK_FS_FILE *root;
@@ -186,25 +190,30 @@ void copyAllFiles(TSK_VS_PART_INFO *vs) {
    if (!dir)
       printf("ERROR: Could not open root directory\n");
 
-   err = mkdir("root", S_IRWXU | S_IRWXG | S_IRWXO);
+   err = mkdir(rootName, S_IRWXU | S_IRWXG | S_IRWXO);
    
    if (err < 0)
       printf("ERROR: Could not make directory\n");
 
-   err = chdir("root");
+   err = chdir(rootName);
    if (err < 0)
       printf("ERROR: Could not change directory\n");
 
    //Prints all files in directory including inum
    for (i = 0; i < dir->names_used; i++) {
       if (strcmp(".", dir->names[i].name) && strcmp("..", dir->names[i].name)) {
-         printf("%s\n", dir->names[i].name);
+         //printf("%s\n", dir->names[i].name);
          copyFile(fs, filePath, dir->names[i].name);
       }
    }
+
+   //Close directory
    tsk_fs_dir_close(dir);
 }
 
+/* The main
+ * Parameters: [executable] [disk image] [name of output folder containing disk image contents] 
+ */
 int main(int argc, char **argv) {
    TSK_IMG_TYPE_ENUM imgType = TSK_IMG_TYPE_DETECT;
    TSK_VS_TYPE_ENUM vsType = TSK_VS_TYPE_DETECT;
@@ -226,6 +235,8 @@ int main(int argc, char **argv) {
    char *diskPath;
    char *dirPath;
    char *buf;
+   char *rootName;
+   char *ext;
    ssize_t bytesRead = 0;
    FILE *fp;
    size_t check;
@@ -235,16 +246,12 @@ int main(int argc, char **argv) {
       printf("ERROR: Incorrect number of arguments given.\n");
       return ERROR;
    }
+
+   //Disk image
    diskPath = argv[1];
-   c = *argv[2];
-   if (c == 'p') {
-      inu = 0;
-      dirPath = argv[3];
-   }
-   else {
-      dirPath = NULL;
-      inu = atoi(argv[3]);
-   }
+
+   //Name of output root folder
+   rootName = argv[2];
 
    //Open the disk image
    disk = tsk_img_open_sing(diskPath, imgType, 0);
@@ -261,11 +268,8 @@ int main(int argc, char **argv) {
    buildPartList(allPartList, &partList);
 
    //Copy all of the files
-   copyAllFiles(partList);
-
-   //Print input directory
-   printDirectory(partList, dirPath, inu);
-
+   copyAllFiles(partList, rootName);
+   
    //Close disk objects
    tsk_vs_close(vs);
    tsk_img_close(disk);
