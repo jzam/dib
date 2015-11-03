@@ -9,10 +9,71 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#define NUM_ARGS 3
-#define ERROR -1
-#define SUCCESS 0
-#define MAX_PATH 260
+#include "dib.h"
+
+/* The main
+ * Parameters: [executable] [disk image] [name of output folder containing disk image contents] 
+ */
+int main(int argc, char **argv) {
+   TSK_IMG_TYPE_ENUM imgType = TSK_IMG_TYPE_DETECT;
+   TSK_VS_TYPE_ENUM vsType = TSK_VS_TYPE_DETECT;
+   TSK_FS_TYPE_ENUM fsType = TSK_FS_TYPE_DETECT;
+   
+   TSK_IMG_INFO *disk;
+   TSK_VS_INFO *vs;
+   TSK_VS_PART_INFO *allPartList;
+   TSK_VS_PART_INFO *partList = NULL;
+   TSK_FS_DIR *dir;
+   TSK_FS_INFO *fs;
+   TSK_INUM_T inum;
+   TSK_FS_FILE *file = NULL;
+
+   unsigned int blockSize;
+   int i;
+   int inu;
+   char c;
+   char *diskPath;
+   char *dirPath;
+   char *buf;
+   char *rootName;
+   char *ext;
+   ssize_t bytesRead = 0;
+   FILE *fp;
+   size_t check;
+
+   //Verify correct number of arguments
+   if (argc != NUM_ARGS) {
+      printf("ERROR: Incorrect number of arguments given.\n");
+      return ERROR;
+   }
+
+   //Disk image
+   diskPath = argv[1];
+
+   //Name of output root folder
+   rootName = argv[2];
+
+   //Open the disk image
+   disk = tsk_img_open_sing(diskPath, imgType, 0);
+   if (disk == NULL) {
+      printf("ERROR: Failed to open disk image @ %s\n", diskPath);
+      return ERROR;
+   }
+
+   //Get info about partitions
+   vs = tsk_vs_open(disk, 0, TSK_VS_TYPE_DETECT);
+   allPartList = vs->part_list;
+
+   //Build list of partitions with valid file systems
+   buildPartList(allPartList, &partList);
+
+   //Copy all of the files
+   copyAllFiles(partList, rootName);
+   
+   //Close disk objects
+   tsk_vs_close(vs);
+   tsk_img_close(disk);
+}
 
 //Construct list of used partitions, so far this program has only been tested with single-partition disks...
 void buildPartList(TSK_VS_PART_INFO *allPartList, TSK_VS_PART_INFO **partListHead) {
@@ -209,68 +270,4 @@ void copyAllFiles(TSK_VS_PART_INFO *vs, char *rootName) {
 
    //Close directory
    tsk_fs_dir_close(dir);
-}
-
-/* The main
- * Parameters: [executable] [disk image] [name of output folder containing disk image contents] 
- */
-int main(int argc, char **argv) {
-   TSK_IMG_TYPE_ENUM imgType = TSK_IMG_TYPE_DETECT;
-   TSK_VS_TYPE_ENUM vsType = TSK_VS_TYPE_DETECT;
-   TSK_FS_TYPE_ENUM fsType = TSK_FS_TYPE_DETECT;
-   
-   TSK_IMG_INFO *disk;
-   TSK_VS_INFO *vs;
-   TSK_VS_PART_INFO *allPartList;
-   TSK_VS_PART_INFO *partList = NULL;
-   TSK_FS_DIR *dir;
-   TSK_FS_INFO *fs;
-   TSK_INUM_T inum;
-   TSK_FS_FILE *file = NULL;
-
-   unsigned int blockSize;
-   int i;
-   int inu;
-   char c;
-   char *diskPath;
-   char *dirPath;
-   char *buf;
-   char *rootName;
-   char *ext;
-   ssize_t bytesRead = 0;
-   FILE *fp;
-   size_t check;
-
-   //Verify correct number of arguments
-   if (argc != NUM_ARGS) {
-      printf("ERROR: Incorrect number of arguments given.\n");
-      return ERROR;
-   }
-
-   //Disk image
-   diskPath = argv[1];
-
-   //Name of output root folder
-   rootName = argv[2];
-
-   //Open the disk image
-   disk = tsk_img_open_sing(diskPath, imgType, 0);
-   if (disk == NULL) {
-      printf("ERROR: Failed to open disk image @ %s\n", diskPath);
-      return ERROR;
-   }
-
-   //Get info about partitions
-   vs = tsk_vs_open(disk, 0, TSK_VS_TYPE_DETECT);
-   allPartList = vs->part_list;
-
-   //Build list of partitions with valid file systems
-   buildPartList(allPartList, &partList);
-
-   //Copy all of the files
-   copyAllFiles(partList, rootName);
-   
-   //Close disk objects
-   tsk_vs_close(vs);
-   tsk_img_close(disk);
 }
